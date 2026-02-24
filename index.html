@@ -4,15 +4,49 @@
     <title>Manda un mensajito</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: sans-serif; text-align: center; padding: 30px; background: #121212; color: white; }
+        body { 
+            font-family: sans-serif; 
+            text-align: center; 
+            padding: 30px; 
+            background: #121212; 
+            color: white; 
+            transition: background 0.5s ease; /* Smooth transition for the flash */
+        }
+        
+        /* The Pulsing Red Class */
+        body.recording {
+            animation: pulse-red 1.5s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% { background-color: #121212; }
+            50% { background-color: #610000; }
+            100% { background-color: #121212; }
+        }
+
         .container { max-width: 400px; margin: 0 auto; }
-        input { padding: 15px; width: 80%; border-radius: 10px; border: 1px solid #444; background: #222; color: white; font-size: 1rem; margin-bottom: 20px; text-align: center; }
-        button { padding: 20px; font-size: 1.2rem; margin: 10px; cursor: pointer; border-radius: 10px; border: none; width: 220px; font-weight: bold; transition: 0.3s; }
+        
+        input { 
+            padding: 15px; width: 85%; border-radius: 10px; border: 1px solid #444; 
+            background: #222; color: white; font-size: 1rem; margin-bottom: 20px; 
+            text-align: center; outline: none;
+        }
+
+        button { 
+            padding: 20px; font-size: 1.2rem; margin: 10px; cursor: pointer; 
+            border-radius: 10px; border: none; width: 220px; font-weight: bold; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
         #record { background: #e74c3c; color: white; }
-        #record:disabled { background: #555; cursor: not-allowed; }
-        #stop { background: #2ecc71; color: white; display: none; }
-        #status { margin-top: 20px; color: #00ff00; font-weight: bold; font-size: 1.1rem; min-height: 1.5em; }
-        #timer { font-size: 3rem; margin: 10px 0; color: #f1c40f; display: none; font-weight: bold; }
+        #stop { background: #ffffff; color: #e74c3c; display: none; }
+        
+        #status { margin-top: 20px; font-weight: bold; font-size: 1.1rem; min-height: 1.5em; color: #00ff00; }
+        
+        /* Glowing text for Recording */
+        .on-air-text { color: #ff0000; text-shadow: 0 0 10px #ff0000; }
+
+        #timer { font-size: 4rem; margin: 10px 0; color: #f1c40f; display: none; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -20,12 +54,12 @@
         <h1>🎙️ Antifaz Recorder</h1>
         <p>Escribe tu nombre y manda un mensaje de 5 segundos</p>
         
-        <input type="text" id="nickname" placeholder="Tu Apodo / Nickname" maxlength="20">
+        <input type="text" id="nickname" placeholder="Tu Apodo / Nickname" maxlength="15">
         
         <div id="timer">00:05</div>
         
         <button id="record">Grabar Mensaje</button>
-        <button id="stop">Enviar a la Radio</button>
+        <button id="stop">DETENER</button>
         
         <div id="status">Ready.</div>
     </div>
@@ -46,10 +80,11 @@
         const status = document.getElementById('status');
         const timerDisplay = document.getElementById('timer');
         const nicknameInput = document.getElementById('nickname');
+        const body = document.body;
 
         recordBtn.onclick = async () => {
             if (!nicknameInput.value.trim()) {
-                alert("Por favor escribe un apodo primero.");
+                alert("Por favor escribe tu apodo.");
                 return;
             }
 
@@ -67,11 +102,12 @@
                 mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
                 mediaRecorder.onstop = uploadAudio;
 
-                // Start 5 second timer
+                // UI Changes
                 timeLeft = MAX_SECONDS;
                 timerDisplay.innerText = "00:05";
                 timerDisplay.style.display = 'block';
                 nicknameInput.disabled = true;
+                body.classList.add('recording'); // Start the red pulse
 
                 countdownInterval = setInterval(() => {
                     timeLeft--;
@@ -82,9 +118,9 @@
                 mediaRecorder.start();
                 recordBtn.style.display = 'none';
                 stopBtn.style.display = 'inline-block';
-                status.innerText = "🔴 Grabando...";
+                status.innerHTML = "<span class='on-air-text'>🔴 EN EL AIRE...</span>";
             } catch (err) {
-                alert("Error de micro: " + err.message);
+                alert("Error: " + err.message);
             }
         };
 
@@ -94,6 +130,7 @@
                 mediaRecorder.stop();
                 mediaRecorder.stream.getTracks().forEach(track => track.stop());
                 
+                body.classList.remove('recording'); // Stop the red pulse
                 timerDisplay.style.display = 'none';
                 stopBtn.style.display = 'none';
                 recordBtn.style.display = 'inline-block';
@@ -107,55 +144,46 @@
             const userNickname = nicknameInput.value.replace(/[^a-z0-9]/gi, '_').toLowerCase();
             const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
             const extension = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
-            
-            // Filename format: Nickname_Timestamp.extension
             const fileName = `${userNickname}_${Date.now()}.${extension}`; 
-            const filePath = 'uploads/' + fileName;
             
             const formData = new FormData();
             formData.append('file', audioBlob, fileName);
-            formData.append('path', filePath);
+            formData.append('path', 'uploads/' + fileName);
 
             try {
-                status.innerText = "🚀 Enviando a Antifaz...";
+                status.innerText = "🚀 Enviando...";
                 
                 const uploadRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload`, {
                     method: 'POST',
                     mode: 'cors',
-                    headers: { 
-                        'Authorization': `Bearer ${API_KEY}`,
-                        'Accept': 'application/json'
-                    },
+                    headers: { 'Authorization': `Bearer ${API_KEY}` },
                     body: formData
                 });
 
-                if (!uploadRes.ok) throw new Error(`Error: ${uploadRes.status}`);
+                if (!uploadRes.ok) throw new Error("Error en subida");
 
-                status.innerText = "✅ ¡Recibido! Procesando...";
-                await new Promise(r => setTimeout(r, 1200)); // Delay for Azura indexing
+                status.innerText = "✅ ¡Enviado! Procesando...";
+                await new Promise(r => setTimeout(r, 1200));
 
                 const queueRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/queue`, {
                     method: 'POST',
                     mode: 'cors',
                     headers: { 
                         'Authorization': `Bearer ${API_KEY}`,
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
+                        'Content-Type': 'application/json' 
                     },
-                    body: JSON.stringify({ file: filePath, is_request: true })
+                    body: JSON.stringify({ file: 'uploads/' + fileName, is_request: true })
                 });
 
                 if (queueRes.ok) {
-                    status.innerText = "📻 ¡Saliendo al aire en breve!";
+                    status.innerText = "📻 ¡Saliendo al aire pronto!";
                     nicknameInput.disabled = false;
                     setTimeout(() => { status.innerText = "Ready."; }, 5000);
-                } else {
-                    status.innerText = "⚠️ Error al encolar.";
                 }
-
             } catch (err) {
                 status.innerText = "❌ Error: " + err.message;
                 nicknameInput.disabled = false;
+                body.classList.remove('recording');
             }
         }
     </script>
