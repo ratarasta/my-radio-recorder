@@ -35,7 +35,7 @@
             padding: 20px; font-size: 1.2rem; margin: 10px; cursor: pointer; 
             border-radius: 10px; border: none; width: 220px; font-weight: bold; 
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            display: inline-block; /* Ensure they are visible when toggled */
+            display: inline-block;
         }
 
         #record { background: #e74c3c; color: white; }
@@ -50,7 +50,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🎙️ Antifaz Recorder 7</h1>
+        <h1>🎙️ Antifaz Recorder 1</h1>
         <p>Manda un mensaje de 5 segundos</p>
         
         <div id="timer">00:05</div>
@@ -70,7 +70,7 @@
         const STATION_ID = "1";
         const API_KEY = "37ef13d410ddcdfb:c89135a6593f03ed8b4f260728b8b7bf";
         const MAX_SECONDS = 5;
-        const TARGET_FOLDER = "/ZZZ";
+        const TARGET_FOLDER = "ZZZ"; // No leading slash!
 
         let mediaRecorder;
         let audioChunks = [];
@@ -84,7 +84,6 @@
         const nicknameInput = document.getElementById('nickname');
         const body = document.body;
 
-        // Reset state helper
         function resetUI() {
             body.classList.remove('recording');
             timerDisplay.style.display = 'none';
@@ -111,7 +110,6 @@
 
                 mediaRecorder.onstop = uploadAudio;
 
-                // Start Visuals
                 timeLeft = MAX_SECONDS;
                 timerDisplay.innerText = "00:05";
                 timerDisplay.style.display = 'block';
@@ -122,7 +120,6 @@
                 stopBtn.style.display = 'inline-block';
                 status.innerHTML = "<span class='on-air-text'>🔴 EN EL AIRE...</span>";
 
-                // Start Timer
                 countdownInterval = setInterval(() => {
                     timeLeft--;
                     timerDisplay.innerText = `00:0${timeLeft}`;
@@ -131,7 +128,7 @@
 
                 mediaRecorder.start();
             } catch (err) {
-                alert("No se pudo acceder al micrófono. Asegúrate de usar HTTPS.");
+                alert("No se pudo acceder al micrófono.");
                 console.error(err);
             }
         };
@@ -140,14 +137,12 @@
             clearInterval(countdownInterval);
             if (mediaRecorder && mediaRecorder.state !== "inactive") {
                 mediaRecorder.stop();
-                // Kill the mic stream tracks
                 mediaRecorder.stream.getTracks().forEach(track => track.stop());
             }
             resetUI();
             status.innerText = "⏳ Subiendo mensaje...";
         }
 
-        // RE-ATTACH the click event explicitly
         stopBtn.addEventListener('click', handleStop);
 
         async function uploadAudio() {
@@ -157,11 +152,13 @@
             const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
             const extension = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
             const fileName = `${userNickname}_${Date.now()}.${extension}`; 
-            const filePath = `${TARGET_FOLDER}/${fileName}`;
+            
+            // CLEAN PATH LOGIC: Ensures the file is inside the folder
+            const filePath = TARGET_FOLDER + "/" + fileName;
             
             const formData = new FormData();
             formData.append('file', audioBlob, fileName);
-            formData.append('path', filePath);
+            formData.append('path', filePath); // Send the combined path
 
             try {
                 const uploadRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload`, {
@@ -174,7 +171,7 @@
                 if (!uploadRes.ok) throw new Error("Error en subida");
 
                 status.innerText = "✅ ¡Enviado!";
-                await new Promise(r => setTimeout(r, 1800));
+                await new Promise(r => setTimeout(r, 2000)); // Wait for server to process
 
                 const queueRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/queue`, {
                     method: 'POST',
@@ -191,10 +188,10 @@
                     nicknameInput.value = ""; 
                     setTimeout(() => { status.innerText = "Ready."; }, 5000);
                 } else {
-                    status.innerText = "⚠️ Error al encolar.";
+                    status.innerText = "⚠️ Subido a " + TARGET_FOLDER + ", pero no se pudo encolar.";
                 }
             } catch (err) {
-                status.innerText = "📢 En breve tu mensaje saldrá al aire: ";
+                status.innerText = "❌ Error: " + err.message;
                 resetUI();
             }
         }
