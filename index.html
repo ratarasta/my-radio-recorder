@@ -13,7 +13,7 @@
     </style>
 </head>
 <body>
-    <h1>🎙️ Station Recorder</h1>
+    <h1>🎙️ Station Recordador</h1>
     <p>Máximo 20 segundos por mensaje loka</p>
     <div id="timer">00:20</div>
     <button id="record">Start Recording</button>
@@ -39,9 +39,6 @@
         recordBtn.onclick = async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                
-                // Chrome/Firefox support 'audio/webm', Safari supports 'audio/mp4'
-                // We'll use the browser's default to avoid corruption
                 mediaRecorder = new MediaRecorder(stream);
                 audioChunks = [];
 
@@ -81,34 +78,62 @@
         stopBtn.onclick = handleStop;
 
         async function uploadAudio() {
-            // We use audio/ogg as the label because AzuraCast ALWAYS processes .ogg
+            // Using ogg as it's the most reliable container for AzuraCast via browser blobs
             const audioBlob = new Blob(audioChunks, { type: 'audio/ogg' });
             const fileName = `msg_${Date.now()}.ogg`; 
+            const filePath = 'uploads/' + fileName;
             
             const formData = new FormData();
             formData.append('file', audioBlob, fileName);
-            formData.append('path', 'uploads/' + fileName);
+            formData.append('path', filePath);
 
             try {
-                const res = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload`, {
+                status.innerText = "🚀 Uploading File...";
+                
+                // STEP 1: UPLOAD
+                const uploadRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload`, {
                     method: 'POST',
-                    headers: { 'X-API-Key': API_KEY },
+                    mode: 'cors',
+                    headers: { 
+                        'X-API-Key': API_KEY,
+                        'Accept': 'application/json'
+                    },
                     body: formData
                 });
 
-                if (res.ok) {
-                    status.innerText = "✅ Sent! Queueing...";
-                    await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/queue`, {
-                        method: 'POST',
-                        headers: { 'X-API-Key': API_KEY, 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ file: 'uploads/' + fileName, is_request: true })
-                    });
-                    status.innerText = "📻 ON AIR SOON!";
-                } else {
-                    status.innerText = "❌ Station Error.";
+                if (!uploadRes.ok) {
+                    throw new Error(`Upload Failed (${uploadRes.status})`);
                 }
+
+                status.innerText = "✅ Uploaded! Registering...";
+
+                // STEP 2: WAIT & QUEUE
+                // We wait 800ms to ensure the file is fully indexed by the station
+                await new Promise(r => setTimeout(r, 800));
+
+                const queueRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/queue`, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: { 
+                        'X-API-Key': API_KEY,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ file: filePath, is_request: true })
+                });
+
+                if (queueRes.ok) {
+                    status.innerText = "📻 ON AIR SOON!";
+                    setTimeout(() => { status.innerText = "Ready."; }, 5000);
+                } else {
+                    status.innerText = "⚠️ File saved, but queueing failed.";
+                    console.error("Queue Error:", await queueRes.text());
+                }
+
             } catch (err) {
-                status.innerText = "❌ Connection Errorificos.";
+                // This specifically prevents "Connection Error" if the upload actually worked
+                status.innerText = "❌ " + err.message;
+                console.error("Detailed Debug:", err);
             }
         }
     </script>
