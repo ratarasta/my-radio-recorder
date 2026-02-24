@@ -10,10 +10,9 @@
             padding: 30px; 
             background: #121212; 
             color: white; 
-            transition: background 0.5s ease; /* Smooth transition for the flash */
+            transition: background 0.5s ease;
         }
         
-        /* The Pulsing Red Class */
         body.recording {
             animation: pulse-red 1.5s infinite;
         }
@@ -28,7 +27,7 @@
         
         input { 
             padding: 15px; width: 85%; border-radius: 10px; border: 1px solid #444; 
-            background: #222; color: white; font-size: 1rem; margin-bottom: 20px; 
+            background: #222; color: white; font-size: 1rem; margin-top: 20px; 
             text-align: center; outline: none;
         }
 
@@ -43,7 +42,6 @@
         
         #status { margin-top: 20px; font-weight: bold; font-size: 1.1rem; min-height: 1.5em; color: #00ff00; }
         
-        /* Glowing text for Recording */
         .on-air-text { color: #ff0000; text-shadow: 0 0 10px #ff0000; }
 
         #timer { font-size: 4rem; margin: 10px 0; color: #f1c40f; display: none; font-weight: bold; }
@@ -52,23 +50,26 @@
 <body>
     <div class="container">
         <h1>🎙️ Antifaz Recorder</h1>
-        <p>Escribe tu nombre y manda un mensaje de 5 segundos</p>
-        
-        <input type="text" id="nickname" placeholder="Tu Apodo / Nickname" maxlength="15">
+        <p>Manda un mensaje de 5 segundos</p>
         
         <div id="timer">00:05</div>
         
         <button id="record">Grabar Mensaje</button>
         <button id="stop">DETENER</button>
+
+        <br>
+        <input type="text" id="nickname" placeholder="Nickname (Opcional)" maxlength="15">
         
         <div id="status">Ready.</div>
     </div>
 
     <script>
+        // --- CONFIGURATION ---
         const AZURA_BASE_URL = "https://www.antifaz.co"; 
         const STATION_ID = "1";
         const API_KEY = "37ef13d410ddcdfb:c89135a6593f03ed8b4f260728b8b7bf";
         const MAX_SECONDS = 5;
+        const TARGET_FOLDER = "ZZZ saludos"; // The name of your folder in AzuraCast
 
         let mediaRecorder;
         let audioChunks = [];
@@ -83,11 +84,6 @@
         const body = document.body;
 
         recordBtn.onclick = async () => {
-            if (!nicknameInput.value.trim()) {
-                alert("Por favor escribe tu apodo.");
-                return;
-            }
-
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 
@@ -102,12 +98,11 @@
                 mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
                 mediaRecorder.onstop = uploadAudio;
 
-                // UI Changes
                 timeLeft = MAX_SECONDS;
                 timerDisplay.innerText = "00:05";
                 timerDisplay.style.display = 'block';
                 nicknameInput.disabled = true;
-                body.classList.add('recording'); // Start the red pulse
+                body.classList.add('recording');
 
                 countdownInterval = setInterval(() => {
                     timeLeft--;
@@ -130,7 +125,7 @@
                 mediaRecorder.stop();
                 mediaRecorder.stream.getTracks().forEach(track => track.stop());
                 
-                body.classList.remove('recording'); // Stop the red pulse
+                body.classList.remove('recording');
                 timerDisplay.style.display = 'none';
                 stopBtn.style.display = 'none';
                 recordBtn.style.display = 'inline-block';
@@ -141,17 +136,22 @@
         stopBtn.onclick = handleStop;
 
         async function uploadAudio() {
-            const userNickname = nicknameInput.value.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            const rawNickname = nicknameInput.value.trim() || "anon";
+            const userNickname = rawNickname.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            
             const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
             const extension = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
             const fileName = `${userNickname}_${Date.now()}.${extension}`; 
             
+            // Updated to point to your new folder
+            const filePath = `${TARGET_FOLDER}/${fileName}`;
+            
             const formData = new FormData();
             formData.append('file', audioBlob, fileName);
-            formData.append('path', 'uploads/' + fileName);
+            formData.append('path', filePath);
 
             try {
-                status.innerText = "🚀 Enviando...";
+                status.innerText = "🚀 Enviando a Saludos...";
                 
                 const uploadRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload`, {
                     method: 'POST',
@@ -162,8 +162,8 @@
 
                 if (!uploadRes.ok) throw new Error("Error en subida");
 
-                status.innerText = "✅ ¡Enviado! Procesando...";
-                await new Promise(r => setTimeout(r, 1200));
+                status.innerText = "✅ ¡Enviado!";
+                await new Promise(r => setTimeout(r, 1500)); // Increased slightly for folder processing
 
                 const queueRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/queue`, {
                     method: 'POST',
@@ -172,13 +172,15 @@
                         'Authorization': `Bearer ${API_KEY}`,
                         'Content-Type': 'application/json' 
                     },
-                    body: JSON.stringify({ file: 'uploads/' + fileName, is_request: true })
+                    body: JSON.stringify({ file: filePath, is_request: true })
                 });
 
                 if (queueRes.ok) {
-                    status.innerText = "📻 ¡Saliendo al aire pronto!";
+                    status.innerText = "📻 ¡Saliendo al aire!";
                     nicknameInput.disabled = false;
                     setTimeout(() => { status.innerText = "Ready."; }, 5000);
+                } else {
+                    status.innerText = "⚠️ Subido a Saludos, pero error al encolar.";
                 }
             } catch (err) {
                 status.innerText = "❌ Error: " + err.message;
