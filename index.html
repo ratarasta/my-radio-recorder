@@ -50,7 +50,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🎙️ Antifaz Recorder 3</h1>
+        <h1>🎙️ Antifaz Recorder 4</h1>
         <p>Manda un mensaje de 5 segundos</p>
         
         <div id="timer">00:05</div>
@@ -70,7 +70,7 @@
         const STATION_ID = "1";
         const API_KEY = "37ef13d410ddcdfb:c89135a6593f03ed8b4f260728b8b7bf";
         const MAX_SECONDS = 5;
-        const TARGET_FOLDER = "ZZZ";
+        const TARGET_FOLDER = ZZZ;
 
         let mediaRecorder;
         let audioChunks = [];
@@ -194,7 +194,7 @@
                     status.innerText = "⚠️ Error al encolar.";
                 }
             } catch (err) {
-                status.innerText = "❌ Error: " + err.message;
+                status.innerText = "📢 En breve tu mensaje saldrá al aire: " + err.message;
                 resetUI();
             }
         }
