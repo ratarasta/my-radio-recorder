@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Manda un mensajito 5</title>
+    <title>Manda un mensajito 6</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { 
@@ -70,9 +70,7 @@
         const STATION_ID = "1";
         const API_KEY = "37ef13d410ddcdfb:c89135a6593f03ed8b4f260728b8b7bf";
         const MAX_SECONDS = 5;
-        
-        // This MUST be the relative folder name from your media root
-        const TARGET_FOLDER = "ZZZ"; 
+        const TARGET_FOLDER = "ZZZ"; // The folder we are targeting
 
         let mediaRecorder;
         let audioChunks = [];
@@ -142,8 +140,7 @@
             const extension = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
             const fileName = `${userNickname}_${Date.now()}.${extension}`; 
             
-            // Path logic: The API adds this to the base Media directory
-            // Result: media/ZZZ/yourfile.m4a
+            // Full path for the Queue command
             const fullFilePath = TARGET_FOLDER + "/" + fileName;
             
             const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
@@ -151,7 +148,7 @@
             formData.append('file', audioBlob, fileName);
 
             try {
-                // We point the upload directly to the ZZZ folder in the query string
+                // We send the TARGET_FOLDER name in the URL query string
                 const uploadUrl = `${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload?path=${encodeURIComponent(TARGET_FOLDER)}`;
                 
                 const uploadRes = await fetch(uploadUrl, {
@@ -184,6 +181,7 @@
                     status.innerText = "⚠️ Subido a " + TARGET_FOLDER + ", pero no se pudo encolar.";
                 }
             } catch (err) {
+                // UPDATED: Custom message for errors
                 status.innerText = "📢 En breve tu mensaje saldrá al aire";
                 resetUI();
             }
