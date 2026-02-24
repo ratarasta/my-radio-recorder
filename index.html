@@ -103,38 +103,42 @@
             const extension = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
             const fileName = `${userNickname}_${Date.now()}.${extension}`; 
             
+            // We construct the full relative path for the server
+            const fullPath = `${TARGET_FOLDER}/${fileName}`;
+            
             const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
             const formData = new FormData();
+            
+            // Adding the file and the target path to the form
             formData.append('file', audioBlob, fileName);
+            formData.append('path', fullPath);
 
             try {
-                // The 'path' parameter here only points to the folder ZZZ
-                const uploadUrl = `${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload?path=${encodeURIComponent(TARGET_FOLDER)}`;
-                
-                status.innerText = "🚀 Subiendo a " + TARGET_FOLDER + "...";
-
-                const uploadRes = await fetch(uploadUrl, {
+                // We keep the upload URL simple and let the FormData carry the instructions
+                const uploadRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload`, {
                     method: 'POST',
                     mode: 'cors',
                     headers: { 
                         'Authorization': `Bearer ${API_KEY}`,
                         'Accept': 'application/json'
+                        // Content-Type is OMITTED so the browser generates the correct boundary
                     },
                     body: formData
                 });
 
-                // Check console for response details
+                // Detailed console logging to catch server-side errors
                 const responseData = await uploadRes.json();
-                console.log("Azura Response:", responseData);
+                console.log("Server Response:", responseData);
 
                 if (uploadRes.ok) {
-                    status.innerText = "📻 ¡Recibido en " + TARGET_FOLDER + "!";
+                    status.innerText = "📻 Recibido en carpeta " + TARGET_FOLDER;
                     nicknameInput.value = "";
                     setTimeout(() => { status.innerText = "Ready."; }, 5000);
                 } else {
                     throw new Error("Server rejected upload");
                 }
             } catch (err) {
+                // Fallback message
                 status.innerText = "📢 Mensaje enviado (Revisar Carpeta)";
                 resetUI();
             }
