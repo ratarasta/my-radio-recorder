@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Manda un mensajito 5</title>
+    <title>Manda un mensajito - Plan B</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { font-family: sans-serif; text-align: center; padding: 30px; background: #121212; color: white; transition: background 0.5s ease; }
@@ -30,17 +30,15 @@
     </div>
 
     <script>
-        // --- CONFIGURATION ---
         const AZURA_BASE_URL = "https://www.antifaz.co"; 
         const STATION_ID = "1";
         const API_KEY = "1589c36baea2ce6b:74bdac5101004f4af6b7ca135dd0ebf1";
-        const MAX_SECONDS = 5;
         const TARGET_FOLDER = "ZZZ"; 
 
         let mediaRecorder;
         let audioChunks = [];
         let countdownInterval;
-        let timeLeft = MAX_SECONDS;
+        let timeLeft = 5;
 
         const recordBtn = document.getElementById('record');
         const stopBtn = document.getElementById('stop');
@@ -66,7 +64,7 @@
                 mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
                 mediaRecorder.onstop = uploadAudio;
 
-                timeLeft = MAX_SECONDS;
+                timeLeft = 5;
                 timerDisplay.innerText = "00:05";
                 timerDisplay.style.display = 'block';
                 nicknameInput.disabled = true;
@@ -103,21 +101,21 @@
             const userNickname = rawNickname.replace(/[^a-z0-9]/gi, '_').toLowerCase();
             const extension = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
             const fileName = `${userNickname}_${Date.now()}.${extension}`; 
-            const fullPath = `${TARGET_FOLDER}/${fileName}`;
             
+            // Path and API Key sent via URL to avoid Header stripping
+            const uploadUrl = `${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload` + 
+                              `?api-key=${encodeURIComponent(API_KEY)}` +
+                              `&path=${encodeURIComponent(TARGET_FOLDER + '/' + fileName)}`;
+
             const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
             const formData = new FormData();
             formData.append('file', audioBlob, fileName);
-            formData.append('path', fullPath);
 
             try {
-                const uploadRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload`, {
+                // Notice: No "Authorization" header used here!
+                const uploadRes = await fetch(uploadUrl, {
                     method: 'POST',
                     mode: 'cors',
-                    headers: { 
-                        'Authorization': `Bearer ${API_KEY}`,
-                        'Accept': 'application/json'
-                    },
                     body: formData
                 });
 
@@ -126,7 +124,7 @@
                 console.log("Server Response:", responseData);
 
                 if (uploadRes.ok) {
-                    status.innerText = "📻 Recibido en carpeta " + TARGET_FOLDER;
+                    status.innerText = "📻 Recibido en carpeta ZZZ";
                     nicknameInput.value = "";
                     setTimeout(() => { status.innerText = "Ready."; }, 5000);
                 } else {
@@ -134,7 +132,7 @@
                 }
             } catch (err) {
                 console.error("Fetch error:", err);
-                status.innerText = "📢 Error de conexión. Revisa la consola.";
+                status.innerText = "📢 Error de conexión.";
                 resetUI();
             }
         }
