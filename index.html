@@ -48,9 +48,16 @@
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 
+                // Detection for compatible types
+                const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
+                                 ? 'audio/webm;codecs=opus' 
+                                 : 'audio/webm';
+
                 mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: mimeType,
                     audioBitsPerSecond: 128000
                 });
+                
                 audioChunks = [];
 
                 mediaRecorder.ondataavailable = e => {
@@ -59,7 +66,6 @@
 
                 mediaRecorder.onstop = uploadAudio;
 
-                // Start Timer Logic
                 timeLeft = MAX_SECONDS;
                 updateTimerDisplay();
                 timerDisplay.style.display = 'block';
@@ -67,9 +73,7 @@
                 countdownInterval = setInterval(() => {
                     timeLeft--;
                     updateTimerDisplay();
-                    if (timeLeft <= 0) {
-                        handleStop(); // Auto-stop at 20 seconds
-                    }
+                    if (timeLeft <= 0) { handleStop(); }
                 }, 1000);
 
                 mediaRecorder.start();
@@ -77,7 +81,7 @@
                 stopBtn.style.display = 'inline-block';
                 status.innerText = "🔴 Recording...";
             } catch (err) {
-                alert("Microphone Error: " + err.message + "\n\nManda tu mensaje cuarenton");
+                alert("Microphone Error: " + err.message);
                 console.error(err);
             }
         };
@@ -87,7 +91,6 @@
                 clearInterval(countdownInterval);
                 mediaRecorder.stop();
                 mediaRecorder.stream.getTracks().forEach(track => track.stop());
-                
                 timerDisplay.style.display = 'none';
                 stopBtn.style.display = 'none';
                 recordBtn.style.display = 'inline-block';
@@ -98,8 +101,12 @@
         stopBtn.onclick = handleStop;
 
         async function uploadAudio() {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-            const fileName = `rec_${Date.now()}.wav`; 
+            // FIX: Use the actual recorded mime type so the file isn't corrupted
+            const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+            
+            // AzuraCast generally handles .webm fine if the internal data matches.
+            // If it still complains, we use .ogg as a fallback name.
+            const fileName = `rec_${Date.now()}.webm`; 
             
             const formData = new FormData();
             formData.append('file', audioBlob, fileName);
@@ -134,7 +141,7 @@
                     }
                 } else {
                     const errText = await uploadRes.text();
-                    status.innerText = "❌ Upload Failed. Check CORS settings.";
+                    status.innerText = "❌ Station rejected file.";
                     console.error("Upload Error:", errText);
                 }
             } catch (err) {
