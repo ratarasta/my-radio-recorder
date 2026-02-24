@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Manda un mensajito 6</title>
+    <title>Manda un mensajito 1</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { 
@@ -70,7 +70,6 @@
         const STATION_ID = "1";
         const API_KEY = "37ef13d410ddcdfb:c89135a6593f03ed8b4f260728b8b7bf";
         const MAX_SECONDS = 5;
-        const TARGET_FOLDER = "ZZZ"; // The folder we are targeting
 
         let mediaRecorder;
         let audioChunks = [];
@@ -138,20 +137,17 @@
             const rawNickname = nicknameInput.value.trim() || "anon";
             const userNickname = rawNickname.replace(/[^a-z0-9]/gi, '_').toLowerCase();
             const extension = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
-            const fileName = `${userNickname}_${Date.now()}.${extension}`; 
             
-            // Full path for the Queue command
-            const fullFilePath = TARGET_FOLDER + "/" + fileName;
+            // Filename only (no folders) for maximum reliability
+            const fileName = `${userNickname}_${Date.now()}.${extension}`; 
             
             const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
             const formData = new FormData();
             formData.append('file', audioBlob, fileName);
+            formData.append('path', fileName); // Save directly to Root Media
 
             try {
-                // We send the TARGET_FOLDER name in the URL query string
-                const uploadUrl = `${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload?path=${encodeURIComponent(TARGET_FOLDER)}`;
-                
-                const uploadRes = await fetch(uploadUrl, {
+                const uploadRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload`, {
                     method: 'POST',
                     mode: 'cors',
                     headers: { 'Authorization': `Bearer ${API_KEY}` },
@@ -161,8 +157,9 @@
                 if (!uploadRes.ok) throw new Error("Upload Failed");
 
                 status.innerText = "✅ ¡Enviado!";
-                await new Promise(r => setTimeout(r, 2000));
+                await new Promise(r => setTimeout(r, 1500));
 
+                // Queue directly from Root Media
                 const queueRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/queue`, {
                     method: 'POST',
                     mode: 'cors',
@@ -170,18 +167,19 @@
                         'Authorization': `Bearer ${API_KEY}`,
                         'Content-Type': 'application/json' 
                     },
-                    body: JSON.stringify({ file: fullFilePath, is_request: true })
+                    body: JSON.stringify({ file: fileName, is_request: true })
                 });
 
                 if (queueRes.ok) {
                     status.innerText = "📻 ¡Saliendo al aire!";
                     nicknameInput.value = ""; 
+                    nicknameInput.disabled = false;
                     setTimeout(() => { status.innerText = "Ready."; }, 5000);
                 } else {
-                    status.innerText = "⚠️ Subido a " + TARGET_FOLDER + ", pero no se pudo encolar.";
+                    throw new Error("Queueing error");
                 }
             } catch (err) {
-                // UPDATED: Custom message for errors
+                // Your custom message displayed on error/success bypass
                 status.innerText = "📢 En breve tu mensaje saldrá al aire";
                 resetUI();
             }
