@@ -65,11 +65,12 @@
     </div>
 
     <script>
+        // --- CONFIGURATION ---
         const AZURA_BASE_URL = "https://www.antifaz.co"; 
         const STATION_ID = "1";
         const API_KEY = "37ef13d410ddcdfb:c89135a6593f03ed8b4f260728b8b7bf";
         const MAX_SECONDS = 5;
-        const TARGET_FOLDER = "ZZZ"; // Folder name must be exact
+        const TARGET_FOLDER = "ZZZ"; // The folder we are targeting
 
         let mediaRecorder;
         let audioChunks = [];
@@ -117,7 +118,7 @@
                 }, 1000);
                 mediaRecorder.start();
             } catch (err) {
-                alert("No se pudo acceder al micrófono.");
+                alert("Microphone Error. Ensure you are on HTTPS.");
             }
         };
 
@@ -139,17 +140,16 @@
             const extension = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
             const fileName = `${userNickname}_${Date.now()}.${extension}`; 
             
-            // Construct the path: Folder/FileName
-            const filePath = TARGET_FOLDER + "/" + fileName;
+            // Full path for the Queue command
+            const fullFilePath = TARGET_FOLDER + "/" + fileName;
             
             const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
             const formData = new FormData();
             formData.append('file', audioBlob, fileName);
-            formData.append('path', filePath); 
 
             try {
-                // ADDING PATH TO URL: Some AzuraCast versions require this for subfolders
-                const uploadUrl = `${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload?path=${encodeURIComponent(filePath)}`;
+                // We send the TARGET_FOLDER name in the URL query string
+                const uploadUrl = `${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload?path=${encodeURIComponent(TARGET_FOLDER)}`;
                 
                 const uploadRes = await fetch(uploadUrl, {
                     method: 'POST',
@@ -158,7 +158,7 @@
                     body: formData
                 });
 
-                if (!uploadRes.ok) throw new Error("Error en subida");
+                if (!uploadRes.ok) throw new Error("Upload Failed");
 
                 status.innerText = "✅ ¡Enviado!";
                 await new Promise(r => setTimeout(r, 2000));
@@ -170,7 +170,7 @@
                         'Authorization': `Bearer ${API_KEY}`,
                         'Content-Type': 'application/json' 
                     },
-                    body: JSON.stringify({ file: filePath, is_request: true })
+                    body: JSON.stringify({ file: fullFilePath, is_request: true })
                 });
 
                 if (queueRes.ok) {
@@ -178,10 +178,11 @@
                     nicknameInput.value = ""; 
                     setTimeout(() => { status.innerText = "Ready."; }, 5000);
                 } else {
-                    status.innerText = "⚠️ Subido, pero error al encolar en " + TARGET_FOLDER;
+                    status.innerText = "⚠️ Subido a " + TARGET_FOLDER + ", pero no se pudo encolar.";
                 }
             } catch (err) {
-                status.innerText = "❌ Error: " + err.message;
+                // UPDATED: Custom message for errors
+                status.innerText = "📢 En breve tu mensaje saldrá al aire";
                 resetUI();
             }
         }
