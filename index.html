@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Manda un mensajito</title>
+    <title>Manda un mensajito 2</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { 
@@ -50,7 +50,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🎙️ Antifaz Recorder 1</h1>
+        <h1>🎙️ Antifaz Recorder</h1>
         <p>Manda un mensaje de 5 segundos</p>
         
         <div id="timer">00:05</div>
@@ -65,12 +65,11 @@
     </div>
 
     <script>
-        // --- CONFIGURATION ---
         const AZURA_BASE_URL = "https://www.antifaz.co"; 
         const STATION_ID = "1";
         const API_KEY = "37ef13d410ddcdfb:c89135a6593f03ed8b4f260728b8b7bf";
         const MAX_SECONDS = 5;
-        const TARGET_FOLDER = "ZZZ"; // No leading slash!
+        const TARGET_FOLDER = "ZZZ"; // Folder name must be exact
 
         let mediaRecorder;
         let audioChunks = [];
@@ -95,19 +94,11 @@
         recordBtn.onclick = async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                
-                let mimeType = 'audio/mp4'; 
-                if (!MediaRecorder.isTypeSupported(mimeType)) {
-                    mimeType = 'audio/webm;codecs=opus';
-                }
+                let mimeType = MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : 'audio/webm;codecs=opus';
 
                 mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
                 audioChunks = [];
-
-                mediaRecorder.ondataavailable = e => {
-                    if (e.data.size > 0) audioChunks.push(e.data);
-                };
-
+                mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
                 mediaRecorder.onstop = uploadAudio;
 
                 timeLeft = MAX_SECONDS;
@@ -115,7 +106,6 @@
                 timerDisplay.style.display = 'block';
                 nicknameInput.disabled = true;
                 body.classList.add('recording');
-                
                 recordBtn.style.display = 'none';
                 stopBtn.style.display = 'inline-block';
                 status.innerHTML = "<span class='on-air-text'>🔴 EN EL AIRE...</span>";
@@ -125,11 +115,9 @@
                     timerDisplay.innerText = `00:0${timeLeft}`;
                     if (timeLeft <= 0) handleStop();
                 }, 1000);
-
                 mediaRecorder.start();
             } catch (err) {
                 alert("No se pudo acceder al micrófono.");
-                console.error(err);
             }
         };
 
@@ -148,20 +136,22 @@
         async function uploadAudio() {
             const rawNickname = nicknameInput.value.trim() || "anon";
             const userNickname = rawNickname.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-            
-            const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
             const extension = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
             const fileName = `${userNickname}_${Date.now()}.${extension}`; 
             
-            // CLEAN PATH LOGIC: Ensures the file is inside the folder
+            // Construct the path: Folder/FileName
             const filePath = TARGET_FOLDER + "/" + fileName;
             
+            const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
             const formData = new FormData();
             formData.append('file', audioBlob, fileName);
-            formData.append('path', filePath); // Send the combined path
+            formData.append('path', filePath); 
 
             try {
-                const uploadRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload`, {
+                // ADDING PATH TO URL: Some AzuraCast versions require this for subfolders
+                const uploadUrl = `${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload?path=${encodeURIComponent(filePath)}`;
+                
+                const uploadRes = await fetch(uploadUrl, {
                     method: 'POST',
                     mode: 'cors',
                     headers: { 'Authorization': `Bearer ${API_KEY}` },
@@ -171,7 +161,7 @@
                 if (!uploadRes.ok) throw new Error("Error en subida");
 
                 status.innerText = "✅ ¡Enviado!";
-                await new Promise(r => setTimeout(r, 2000)); // Wait for server to process
+                await new Promise(r => setTimeout(r, 2000));
 
                 const queueRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/queue`, {
                     method: 'POST',
@@ -188,7 +178,7 @@
                     nicknameInput.value = ""; 
                     setTimeout(() => { status.innerText = "Ready."; }, 5000);
                 } else {
-                    status.innerText = "⚠️ Subido a " + TARGET_FOLDER + ", pero no se pudo encolar.";
+                    status.innerText = "⚠️ Subido, pero error al encolar en " + TARGET_FOLDER;
                 }
             } catch (err) {
                 status.innerText = "❌ Error: " + err.message;
