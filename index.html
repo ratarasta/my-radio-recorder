@@ -1,193 +1,63 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Manda un mensajito</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body { 
-            font-family: sans-serif; 
-            text-align: center; 
-            padding: 30px; 
-            background: #121212; 
-            color: white; 
-            transition: background 0.5s ease;
-        }
+async function uploadAudio() {
+    const rawNickname = nicknameInput.value.trim() || "anon";
+    const userNickname = rawNickname.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    
+    const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+    const extension = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
+    const fileName = `${userNickname}_${Date.now()}.${extension}`; 
+    
+    // Explicit path: FolderName/FileName.ext
+    // Make sure TARGET_FOLDER matches your folder name exactly!
+    const folderPath = "ZZZ saludos"; 
+    const fullPath = folderPath + "/" + fileName;
+
+    const formData = new FormData();
+    formData.append('file', audioBlob, fileName);
+    
+    // IMPORTANT: AzuraCast API expects the folder path here
+    formData.append('path', fullPath); 
+
+    try {
+        status.innerText = "🚀 Enviando a " + folderPath + "...";
         
-        body.recording {
-            animation: pulse-red 1.5s infinite;
+        const uploadRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload`, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Authorization': `Bearer ${API_KEY}` },
+            body: formData
+        });
+
+        if (!uploadRes.ok) throw new Error("Error en subida");
+
+        status.innerText = "✅ ¡Enviado!";
+        await new Promise(r => setTimeout(r, 1500));
+
+        // When queueing, we MUST use the same full path
+        const queueRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/queue`, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 
+                'Authorization': `Bearer ${API_KEY}`,
+                'Content-Type': 'application/json' 
+            },
+            body: JSON.stringify({ 
+                file: fullPath, // Use the path with the folder name
+                is_request: true 
+            })
+        });
+
+        if (queueRes.ok) {
+            status.innerText = "📻 ¡Saliendo al aire!";
+            nicknameInput.value = ""; 
+            nicknameInput.disabled = false;
+            setTimeout(() => { status.innerText = "Ready."; }, 5000);
+        } else {
+            status.innerText = "⚠️ Error al encolar en " + folderPath;
+            console.error("Queue Failed. Check if folder name is exactly: " + folderPath);
         }
-
-        @keyframes pulse-red {
-            0% { background-color: #121212; }
-            50% { background-color: #610000; }
-            100% { background-color: #121212; }
-        }
-
-        .container { max-width: 400px; margin: 0 auto; }
-        
-        input { 
-            padding: 15px; width: 85%; border-radius: 10px; border: 1px solid #444; 
-            background: #222; color: white; font-size: 1rem; margin-top: 20px; 
-            text-align: center; outline: none;
-        }
-
-        button { 
-            padding: 20px; font-size: 1.2rem; margin: 10px; cursor: pointer; 
-            border-radius: 10px; border: none; width: 220px; font-weight: bold; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-        }
-
-        #record { background: #e74c3c; color: white; }
-        #stop { background: #ffffff; color: #e74c3c; display: none; }
-        
-        #status { margin-top: 20px; font-weight: bold; font-size: 1.1rem; min-height: 1.5em; color: #00ff00; }
-        
-        .on-air-text { color: #ff0000; text-shadow: 0 0 10px #ff0000; }
-
-        #timer { font-size: 4rem; margin: 10px 0; color: #f1c40f; display: none; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🎙️ Antifaz Recorder</h1>
-        <p>Manda un mensaje de 5 segundos</p>
-        
-        <div id="timer">00:05</div>
-        
-        <button id="record">Grabar Mensaje</button>
-        <button id="stop">DETENER</button>
-
-        <br>
-        <input type="text" id="nickname" placeholder="Nickname (Opcional)" maxlength="15">
-        
-        <div id="status">Ready.</div>
-    </div>
-
-    <script>
-        // --- CONFIGURATION ---
-        const AZURA_BASE_URL = "https://www.antifaz.co"; 
-        const STATION_ID = "1";
-        const API_KEY = "37ef13d410ddcdfb:c89135a6593f03ed8b4f260728b8b7bf";
-        const MAX_SECONDS = 5;
-        const TARGET_FOLDER = "ZZZ saludos"; // The name of your folder in AzuraCast
-
-        let mediaRecorder;
-        let audioChunks = [];
-        let countdownInterval;
-        let timeLeft = MAX_SECONDS;
-
-        const recordBtn = document.getElementById('record');
-        const stopBtn = document.getElementById('stop');
-        const status = document.getElementById('status');
-        const timerDisplay = document.getElementById('timer');
-        const nicknameInput = document.getElementById('nickname');
-        const body = document.body;
-
-        recordBtn.onclick = async () => {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                
-                let mimeType = 'audio/mp4'; 
-                if (!MediaRecorder.isTypeSupported(mimeType)) {
-                    mimeType = 'audio/webm;codecs=opus';
-                }
-
-                mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
-                audioChunks = [];
-
-                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-                mediaRecorder.onstop = uploadAudio;
-
-                timeLeft = MAX_SECONDS;
-                timerDisplay.innerText = "00:05";
-                timerDisplay.style.display = 'block';
-                nicknameInput.disabled = true;
-                body.classList.add('recording');
-
-                countdownInterval = setInterval(() => {
-                    timeLeft--;
-                    timerDisplay.innerText = `00:0${timeLeft}`;
-                    if (timeLeft <= 0) handleStop();
-                }, 1000);
-
-                mediaRecorder.start();
-                recordBtn.style.display = 'none';
-                stopBtn.style.display = 'inline-block';
-                status.innerHTML = "<span class='on-air-text'>🔴 EN EL AIRE...</span>";
-            } catch (err) {
-                alert("Error: " + err.message);
-            }
-        };
-
-        function handleStop() {
-            if (mediaRecorder && mediaRecorder.state !== "inactive") {
-                clearInterval(countdownInterval);
-                mediaRecorder.stop();
-                mediaRecorder.stream.getTracks().forEach(track => track.stop());
-                
-                body.classList.remove('recording');
-                timerDisplay.style.display = 'none';
-                stopBtn.style.display = 'none';
-                recordBtn.style.display = 'inline-block';
-                status.innerText = "⏳ Subiendo mensaje...";
-            }
-        }
-
-        stopBtn.onclick = handleStop;
-
-        async function uploadAudio() {
-            const rawNickname = nicknameInput.value.trim() || "anon";
-            const userNickname = rawNickname.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-            
-            const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
-            const extension = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
-            const fileName = `${userNickname}_${Date.now()}.${extension}`; 
-            
-            // Updated to point to your new folder
-            const filePath = `${TARGET_FOLDER}/${fileName}`;
-            
-            const formData = new FormData();
-            formData.append('file', audioBlob, fileName);
-            formData.append('path', filePath);
-
-            try {
-                status.innerText = "🚀 Enviando a Saludos...";
-                
-                const uploadRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload`, {
-                    method: 'POST',
-                    mode: 'cors',
-                    headers: { 'Authorization': `Bearer ${API_KEY}` },
-                    body: formData
-                });
-
-                if (!uploadRes.ok) throw new Error("Error en subida");
-
-                status.innerText = "✅ ¡Enviado!";
-                await new Promise(r => setTimeout(r, 1500)); // Increased slightly for folder processing
-
-                const queueRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/queue`, {
-                    method: 'POST',
-                    mode: 'cors',
-                    headers: { 
-                        'Authorization': `Bearer ${API_KEY}`,
-                        'Content-Type': 'application/json' 
-                    },
-                    body: JSON.stringify({ file: filePath, is_request: true })
-                });
-
-                if (queueRes.ok) {
-                    status.innerText = "📻 ¡Saliendo al aire!";
-                    nicknameInput.disabled = false;
-                    setTimeout(() => { status.innerText = "Ready."; }, 5000);
-                } else {
-                    status.innerText = "⚠️ Subido a Saludos, pero error al encolar.";
-                }
-            } catch (err) {
-                status.innerText = "❌ Error: " + err.message;
-                nicknameInput.disabled = false;
-                body.classList.remove('recording');
-            }
-        }
-    </script>
-</body>
-</html>
+    } catch (err) {
+        status.innerText = "❌ Error: " + err.message;
+        nicknameInput.disabled = false;
+        body.classList.remove('recording');
+    }
+}
