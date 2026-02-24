@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Manda un mensajito 4</title>
+    <title>Manda un mensajito 5</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { 
@@ -70,6 +70,8 @@
         const STATION_ID = "1";
         const API_KEY = "37ef13d410ddcdfb:c89135a6593f03ed8b4f260728b8b7bf";
         const MAX_SECONDS = 5;
+        
+        // This MUST be the relative folder name from your media root
         const TARGET_FOLDER = "ZZZ"; 
 
         let mediaRecorder;
@@ -140,18 +142,16 @@
             const extension = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
             const fileName = `${userNickname}_${Date.now()}.${extension}`; 
             
-            // Path relative to station media root
+            // Path logic: The API adds this to the base Media directory
+            // Result: media/ZZZ/yourfile.m4a
             const fullFilePath = TARGET_FOLDER + "/" + fileName;
             
             const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
             const formData = new FormData();
             formData.append('file', audioBlob, fileName);
-            
-            // PATH ADDED TO FORMDATA: This is the primary way AzuraCast handles subdirectories
-            formData.append('path', fullFilePath);
 
             try {
-                // We keep the folder destination in the URL as well for "double-coverage"
+                // We point the upload directly to the ZZZ folder in the query string
                 const uploadUrl = `${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload?path=${encodeURIComponent(TARGET_FOLDER)}`;
                 
                 const uploadRes = await fetch(uploadUrl, {
@@ -181,7 +181,7 @@
                     nicknameInput.value = ""; 
                     setTimeout(() => { status.innerText = "Ready."; }, 5000);
                 } else {
-                    status.innerText = "⚠️ Subido, pero error al encolar.";
+                    status.innerText = "⚠️ Subido a " + TARGET_FOLDER + ", pero no se pudo encolar.";
                 }
             } catch (err) {
                 status.innerText = "📢 En breve tu mensaje saldrá al aire";
