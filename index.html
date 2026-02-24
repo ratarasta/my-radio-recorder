@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Manda un mensaje</title>
+    <title>Manda un mensajito</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { font-family: sans-serif; text-align: center; padding: 50px; background: #121212; color: white; }
@@ -14,16 +14,13 @@
 </head>
 <body>
     <h1>🎙️ Station Recorder</h1>
-    <p>Máximo 20 segundos por mensaje</p>
-    
+    <p>Máximo 20 segundos por mensaje loka</p>
     <div id="timer">00:20</div>
-    
     <button id="record">Start Recording</button>
     <button id="stop">Stop & Send to Radio</button>
     <div id="status">Ready.</div>
 
     <script>
-        // --- CONFIGURATION ---
         const AZURA_BASE_URL = "https://www.antifaz.co"; 
         const STATION_ID = "1";
         const API_KEY = "37ef13d410ddcdfb:c89135a6593f03ed8b4f260728b8b7bf";
@@ -39,41 +36,25 @@
         const status = document.getElementById('status');
         const timerDisplay = document.getElementById('timer');
 
-        function updateTimerDisplay() {
-            const sec = timeLeft < 10 ? "0" + timeLeft : timeLeft;
-            timerDisplay.innerText = `00:${sec}`;
-        }
-
         recordBtn.onclick = async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 
-                // Detection for compatible types
-                const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
-                                 ? 'audio/webm;codecs=opus' 
-                                 : 'audio/webm';
-
-                mediaRecorder = new MediaRecorder(stream, {
-                    mimeType: mimeType,
-                    audioBitsPerSecond: 128000
-                });
-                
+                // Chrome/Firefox support 'audio/webm', Safari supports 'audio/mp4'
+                // We'll use the browser's default to avoid corruption
+                mediaRecorder = new MediaRecorder(stream);
                 audioChunks = [];
 
-                mediaRecorder.ondataavailable = e => {
-                    if (e.data.size > 0) audioChunks.push(e.data);
-                };
-
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
                 mediaRecorder.onstop = uploadAudio;
 
                 timeLeft = MAX_SECONDS;
-                updateTimerDisplay();
+                timerDisplay.innerText = "00:20";
                 timerDisplay.style.display = 'block';
-                
                 countdownInterval = setInterval(() => {
                     timeLeft--;
-                    updateTimerDisplay();
-                    if (timeLeft <= 0) { handleStop(); }
+                    timerDisplay.innerText = `00:${timeLeft < 10 ? "0" + timeLeft : timeLeft}`;
+                    if (timeLeft <= 0) handleStop();
                 }, 1000);
 
                 mediaRecorder.start();
@@ -81,8 +62,7 @@
                 stopBtn.style.display = 'inline-block';
                 status.innerText = "🔴 Recording...";
             } catch (err) {
-                alert("Microphone Error: " + err.message);
-                console.error(err);
+                alert("Error: " + err.message);
             }
         };
 
@@ -94,59 +74,41 @@
                 timerDisplay.style.display = 'none';
                 stopBtn.style.display = 'none';
                 recordBtn.style.display = 'inline-block';
-                status.innerText = "⏳ Processing & Uploading...";
+                status.innerText = "⏳ Processing...";
             }
         }
 
         stopBtn.onclick = handleStop;
 
         async function uploadAudio() {
-            // FIX: Use the actual recorded mime type so the file isn't corrupted
-            const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
-            
-            // AzuraCast generally handles .webm fine if the internal data matches.
-            // If it still complains, we use .ogg as a fallback name.
-            const fileName = `rec_${Date.now()}.webm`; 
+            // We use audio/ogg as the label because AzuraCast ALWAYS processes .ogg
+            const audioBlob = new Blob(audioChunks, { type: 'audio/ogg' });
+            const fileName = `msg_${Date.now()}.ogg`; 
             
             const formData = new FormData();
             formData.append('file', audioBlob, fileName);
             formData.append('path', 'uploads/' + fileName);
 
             try {
-                status.innerText = "🚀 Sending to AzuraCast...";
-                
-                const uploadRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload`, {
+                const res = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload`, {
                     method: 'POST',
                     headers: { 'X-API-Key': API_KEY },
                     body: formData
                 });
 
-                if (uploadRes.ok) {
-                    status.innerText = "✅ Uploaded! Adding to Queue...";
-                    
-                    const queueRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/queue`, {
+                if (res.ok) {
+                    status.innerText = "✅ Sent! Queueing...";
+                    await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/queue`, {
                         method: 'POST',
-                        headers: { 
-                            'X-API-Key': API_KEY,
-                            'Content-Type': 'application/json' 
-                        },
+                        headers: { 'X-API-Key': API_KEY, 'Content-Type': 'application/json' },
                         body: JSON.stringify({ file: 'uploads/' + fileName, is_request: true })
                     });
-
-                    if(queueRes.ok) {
-                        status.innerText = "📻 ON AIR SOON!";
-                        setTimeout(() => { status.innerText = "Ready."; }, 5000);
-                    } else {
-                        status.innerText = "⚠️ Uploaded, but couldn't queue.";
-                    }
+                    status.innerText = "📻 ON AIR SOON!";
                 } else {
-                    const errText = await uploadRes.text();
-                    status.innerText = "❌ Station rejected file.";
-                    console.error("Upload Error:", errText);
+                    status.innerText = "❌ Station Error.";
                 }
             } catch (err) {
-                status.innerText = "❌ Network Error.";
-                console.error(err);
+                status.innerText = "❌ Connection Errorificos.";
             }
         }
     </script>
