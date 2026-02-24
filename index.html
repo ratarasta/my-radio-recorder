@@ -51,7 +51,7 @@
                 stopBtn.style.display = 'inline-block';
                 status.innerText = "🔴 Recording...";
             } catch (err) {
-                alert("Microphone Error: " + err.message + "\n\nMake sure you are using HTTPS or Localhost!");
+                alert("Microphone Error: " + err.message + "\n\nManda tu mensaje cuarenton");
                 console.error(err);
             }
         };
@@ -69,7 +69,7 @@
         async function uploadAudio() {
             // We record as WebM but name it .webm; AzuraCast handles this perfectly.
             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-            const fileName = `rec_${Date.now()}.mp3`;
+            const fileName = `rec_${Date.now()}.webm`;
             
             const formData = new FormData();
             formData.append('file', audioBlob, fileName);
