@@ -1,30 +1,40 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Mande un mensajito</title>
+    <title>Manda un mensajito</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: sans-serif; text-align: center; padding: 50px; background: #121212; color: white; }
-        button { padding: 20px; font-size: 1.2rem; margin: 10px; cursor: pointer; border-radius: 10px; border: none; width: 220px; font-weight: bold; }
+        body { font-family: sans-serif; text-align: center; padding: 30px; background: #121212; color: white; }
+        .container { max-width: 400px; margin: 0 auto; }
+        input { padding: 15px; width: 80%; border-radius: 10px; border: 1px solid #444; background: #222; color: white; font-size: 1rem; margin-bottom: 20px; text-align: center; }
+        button { padding: 20px; font-size: 1.2rem; margin: 10px; cursor: pointer; border-radius: 10px; border: none; width: 220px; font-weight: bold; transition: 0.3s; }
         #record { background: #e74c3c; color: white; }
+        #record:disabled { background: #555; cursor: not-allowed; }
         #stop { background: #2ecc71; color: white; display: none; }
-        #status { margin-top: 20px; color: #00ff00; font-weight: bold; font-size: 1.1rem; }
-        #timer { font-size: 2.5rem; margin: 15px 0; color: #f1c40f; display: none; }
+        #status { margin-top: 20px; color: #00ff00; font-weight: bold; font-size: 1.1rem; min-height: 1.5em; }
+        #timer { font-size: 3rem; margin: 10px 0; color: #f1c40f; display: none; font-weight: bold; }
     </style>
 </head>
 <body>
-    <h1>🎙️ Estacion Recorder</h1>
-    <p>Máximo 20 segundos por mensaje loka</p>
-    <div id="timer">00:20</div>
-    <button id="record">Start Recording</button>
-    <button id="stop">Stop & Send to Radio</button>
-    <div id="status">Ready.</div>
+    <div class="container">
+        <h1>🎙️ Antifaz Recorder</h1>
+        <p>Escribe tu nombre y manda un mensaje de 5 segundos</p>
+        
+        <input type="text" id="nickname" placeholder="Tu Apodo / Nickname" maxlength="20">
+        
+        <div id="timer">00:05</div>
+        
+        <button id="record">Grabar Mensaje</button>
+        <button id="stop">Enviar a la Radio</button>
+        
+        <div id="status">Ready.</div>
+    </div>
 
     <script>
         const AZURA_BASE_URL = "https://www.antifaz.co"; 
         const STATION_ID = "1";
         const API_KEY = "37ef13d410ddcdfb:c89135a6593f03ed8b4f260728b8b7bf";
-        const MAX_SECONDS = 20;
+        const MAX_SECONDS = 5;
 
         let mediaRecorder;
         let audioChunks = [];
@@ -35,12 +45,17 @@
         const stopBtn = document.getElementById('stop');
         const status = document.getElementById('status');
         const timerDisplay = document.getElementById('timer');
+        const nicknameInput = document.getElementById('nickname');
 
         recordBtn.onclick = async () => {
+            if (!nicknameInput.value.trim()) {
+                alert("Por favor escribe un apodo primero.");
+                return;
+            }
+
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 
-                // Determine the best supported format (AAC is best for AzuraCast)
                 let mimeType = 'audio/mp4'; 
                 if (!MediaRecorder.isTypeSupported(mimeType)) {
                     mimeType = 'audio/webm;codecs=opus';
@@ -52,21 +67,24 @@
                 mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
                 mediaRecorder.onstop = uploadAudio;
 
+                // Start 5 second timer
                 timeLeft = MAX_SECONDS;
-                timerDisplay.innerText = "00:20";
+                timerDisplay.innerText = "00:05";
                 timerDisplay.style.display = 'block';
+                nicknameInput.disabled = true;
+
                 countdownInterval = setInterval(() => {
                     timeLeft--;
-                    timerDisplay.innerText = `00:${timeLeft < 10 ? "0" + timeLeft : timeLeft}`;
+                    timerDisplay.innerText = `00:0${timeLeft}`;
                     if (timeLeft <= 0) handleStop();
                 }, 1000);
 
                 mediaRecorder.start();
                 recordBtn.style.display = 'none';
                 stopBtn.style.display = 'inline-block';
-                status.innerText = "🔴 Recording...";
+                status.innerText = "🔴 Grabando...";
             } catch (err) {
-                alert("Error: " + err.message);
+                alert("Error de micro: " + err.message);
             }
         };
 
@@ -75,20 +93,23 @@
                 clearInterval(countdownInterval);
                 mediaRecorder.stop();
                 mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                
                 timerDisplay.style.display = 'none';
                 stopBtn.style.display = 'none';
                 recordBtn.style.display = 'inline-block';
-                status.innerText = "⏳ Processing...";
+                status.innerText = "⏳ Subiendo mensaje...";
             }
         }
 
         stopBtn.onclick = handleStop;
 
         async function uploadAudio() {
-            // Using M4A (AAC) which is natively supported and scanned by AzuraCast
+            const userNickname = nicknameInput.value.replace(/[^a-z0-9]/gi, '_').toLowerCase();
             const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
             const extension = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
-            const fileName = `msg_${Date.now()}.${extension}`; 
+            
+            // Filename format: Nickname_Timestamp.extension
+            const fileName = `${userNickname}_${Date.now()}.${extension}`; 
             const filePath = 'uploads/' + fileName;
             
             const formData = new FormData();
@@ -96,7 +117,7 @@
             formData.append('path', filePath);
 
             try {
-                status.innerText = "🚀 Sending to Antifaz...";
+                status.innerText = "🚀 Enviando a Antifaz...";
                 
                 const uploadRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload`, {
                     method: 'POST',
@@ -108,10 +129,10 @@
                     body: formData
                 });
 
-                if (!uploadRes.ok) throw new Error(`Upload Failed: ${uploadRes.status}`);
+                if (!uploadRes.ok) throw new Error(`Error: ${uploadRes.status}`);
 
-                status.innerText = "✅ Saved! Adding to Radio...";
-                await new Promise(r => setTimeout(r, 1000)); // Wait 1s for Azura indexing
+                status.innerText = "✅ ¡Recibido! Procesando...";
+                await new Promise(r => setTimeout(r, 1200)); // Delay for Azura indexing
 
                 const queueRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/queue`, {
                     method: 'POST',
@@ -125,14 +146,16 @@
                 });
 
                 if (queueRes.ok) {
-                    status.innerText = "📻 ON AIR SOON!";
+                    status.innerText = "📻 ¡Saliendo al aire en breve!";
+                    nicknameInput.disabled = false;
                     setTimeout(() => { status.innerText = "Ready."; }, 5000);
                 } else {
-                    status.innerText = "⚠️ File saved, but queueing failed.";
+                    status.innerText = "⚠️ Error al encolar.";
                 }
 
             } catch (err) {
-                status.innerText = "❌ " + err.message;
+                status.innerText = "❌ Error: " + err.message;
+                nicknameInput.disabled = false;
             }
         }
     </script>
