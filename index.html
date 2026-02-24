@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Manda un mensajito - Plan B</title>
+    <title>Manda un mensajito 22</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { font-family: sans-serif; text-align: center; padding: 30px; background: #121212; color: white; transition: background 0.5s ease; }
@@ -105,7 +105,7 @@
             // Path and API Key sent via URL to avoid Header stripping
             const uploadUrl = `${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload` + 
                               `?api-key=${encodeURIComponent(API_KEY)}` +
-                              `&path=${encodeURIComponent(TARGET_FOLDER + ' / ' + fileName)}`;
+                              `&path=${encodeURIComponent(TARGET_FOLDER +'/'+fileName)}`;
             const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
             const formData = new FormData();
             formData.append('file', audioBlob, fileName);
