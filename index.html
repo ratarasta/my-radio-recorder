@@ -105,8 +105,7 @@
             // Path and API Key sent via URL to avoid Header stripping
             const uploadUrl = `${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload` + 
                               `?api-key=${encodeURIComponent(API_KEY)}` +
-                              `&path=${encodeURIComponent(TARGET_FOLDER + '/' + fileName)}`;
-
+                              `&path=${encodeURIComponent(TARGET_FOLDER + ' / ' + fileName)}`;
             const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
             const formData = new FormData();
             formData.append('file', audioBlob, fileName);
