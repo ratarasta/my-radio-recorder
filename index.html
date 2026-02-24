@@ -13,7 +13,7 @@
     </style>
 </head>
 <body>
-    <h1>🎙️ Station Recordador</h1>
+    <h1>🎙️ estacion Recorder</h1>
     <p>Máximo 20 segundos por mensaje loka</p>
     <div id="timer">00:20</div>
     <button id="record">Start Recording</button>
@@ -39,7 +39,14 @@
         recordBtn.onclick = async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
+                
+                // Determine the best supported format (AAC is best for AzuraCast)
+                let mimeType = 'audio/mp4'; 
+                if (!MediaRecorder.isTypeSupported(mimeType)) {
+                    mimeType = 'audio/webm;codecs=opus';
+                }
+
+                mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
                 audioChunks = [];
 
                 mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
@@ -78,9 +85,10 @@
         stopBtn.onclick = handleStop;
 
         async function uploadAudio() {
-            // Using ogg as it's the most reliable container for AzuraCast via browser blobs
-            const audioBlob = new Blob(audioChunks, { type: 'audio/ogg' });
-            const fileName = `msg_${Date.now()}.ogg`; 
+            // Using M4A (AAC) which is natively supported and scanned by AzuraCast
+            const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+            const extension = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
+            const fileName = `msg_${Date.now()}.${extension}`; 
             const filePath = 'uploads/' + fileName;
             
             const formData = new FormData();
@@ -88,34 +96,28 @@
             formData.append('path', filePath);
 
             try {
-                status.innerText = "🚀 Uploading File...";
+                status.innerText = "🚀 Sending to Antifaz...";
                 
-                // STEP 1: UPLOAD
                 const uploadRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload`, {
                     method: 'POST',
                     mode: 'cors',
                     headers: { 
-                        'X-API-Key': API_KEY,
+                        'Authorization': `Bearer ${API_KEY}`,
                         'Accept': 'application/json'
                     },
                     body: formData
                 });
 
-                if (!uploadRes.ok) {
-                    throw new Error(`Upload Failed (${uploadRes.status})`);
-                }
+                if (!uploadRes.ok) throw new Error(`Upload Failed: ${uploadRes.status}`);
 
-                status.innerText = "✅ Uploaded! Registering...";
-
-                // STEP 2: WAIT & QUEUE
-                // We wait 800ms to ensure the file is fully indexed by the station
-                await new Promise(r => setTimeout(r, 800));
+                status.innerText = "✅ Saved! Adding to Radio...";
+                await new Promise(r => setTimeout(r, 1000)); // Wait 1s for Azura indexing
 
                 const queueRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/queue`, {
                     method: 'POST',
                     mode: 'cors',
                     headers: { 
-                        'X-API-Key': API_KEY,
+                        'Authorization': `Bearer ${API_KEY}`,
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
@@ -127,13 +129,10 @@
                     setTimeout(() => { status.innerText = "Ready."; }, 5000);
                 } else {
                     status.innerText = "⚠️ File saved, but queueing failed.";
-                    console.error("Queue Error:", await queueRes.text());
                 }
 
             } catch (err) {
-                // This specifically prevents "Connection Error" if the upload actually worked
                 status.innerText = "❌ " + err.message;
-                console.error("Detailed Debug:", err);
             }
         }
     </script>
