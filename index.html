@@ -35,6 +35,7 @@
             padding: 20px; font-size: 1.2rem; margin: 10px; cursor: pointer; 
             border-radius: 10px; border: none; width: 220px; font-weight: bold; 
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            display: inline-block; /* Ensure they are visible when toggled */
         }
 
         #record { background: #e74c3c; color: white; }
@@ -49,7 +50,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🎙️ Anti Mensaje 1</h1>
+        <h1>🎙️ Antifaz Recorder2</h1>
         <p>Manda un mensaje de 5 segundos</p>
         
         <div id="timer">00:05</div>
@@ -69,7 +70,7 @@
         const STATION_ID = "1";
         const API_KEY = "37ef13d410ddcdfb:c89135a6593f03ed8b4f260728b8b7bf";
         const MAX_SECONDS = 5;
-        const TARGET_FOLDER = "ZZZ saludos"; // Exact folder name in AzuraCast
+        const TARGET_FOLDER = "ZZZ saludos";
 
         let mediaRecorder;
         let audioChunks = [];
@@ -83,6 +84,15 @@
         const nicknameInput = document.getElementById('nickname');
         const body = document.body;
 
+        // Reset state helper
+        function resetUI() {
+            body.classList.remove('recording');
+            timerDisplay.style.display = 'none';
+            stopBtn.style.display = 'none';
+            recordBtn.style.display = 'inline-block';
+            nicknameInput.disabled = false;
+        }
+
         recordBtn.onclick = async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -95,15 +105,24 @@
                 mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
                 audioChunks = [];
 
-                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.ondataavailable = e => {
+                    if (e.data.size > 0) audioChunks.push(e.data);
+                };
+
                 mediaRecorder.onstop = uploadAudio;
 
+                // Start Visuals
                 timeLeft = MAX_SECONDS;
                 timerDisplay.innerText = "00:05";
                 timerDisplay.style.display = 'block';
                 nicknameInput.disabled = true;
                 body.classList.add('recording');
+                
+                recordBtn.style.display = 'none';
+                stopBtn.style.display = 'inline-block';
+                status.innerHTML = "<span class='on-air-text'>🔴 EN EL AIRE...</span>";
 
+                // Start Timer
                 countdownInterval = setInterval(() => {
                     timeLeft--;
                     timerDisplay.innerText = `00:0${timeLeft}`;
@@ -111,29 +130,25 @@
                 }, 1000);
 
                 mediaRecorder.start();
-                recordBtn.style.display = 'none';
-                stopBtn.style.display = 'inline-block';
-                status.innerHTML = "<span class='on-air-text'>🔴 EN EL AIRE...</span>";
             } catch (err) {
-                alert("Error: " + err.message);
+                alert("No se pudo acceder al micrófono. Asegúrate de usar HTTPS.");
+                console.error(err);
             }
         };
 
         function handleStop() {
+            clearInterval(countdownInterval);
             if (mediaRecorder && mediaRecorder.state !== "inactive") {
-                clearInterval(countdownInterval);
                 mediaRecorder.stop();
+                // Kill the mic stream tracks
                 mediaRecorder.stream.getTracks().forEach(track => track.stop());
-                
-                body.classList.remove('recording');
-                timerDisplay.style.display = 'none';
-                stopBtn.style.display = 'none';
-                recordBtn.style.display = 'inline-block';
-                status.innerText = "⏳ Subiendo mensaje...";
             }
+            resetUI();
+            status.innerText = "⏳ Subiendo mensaje...";
         }
 
-        stopBtn.onclick = handleStop;
+        // RE-ATTACH the click event explicitly
+        stopBtn.addEventListener('click', handleStop);
 
         async function uploadAudio() {
             const rawNickname = nicknameInput.value.trim() || "anon";
@@ -142,8 +157,47 @@
             const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
             const extension = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
             const fileName = `${userNickname}_${Date.now()}.${extension}`; 
-            
-            // This ensures the path is 'ZZZ saludos/filename.ext'
             const filePath = `${TARGET_FOLDER}/${fileName}`;
             
-            const
+            const formData = new FormData();
+            formData.append('file', audioBlob, fileName);
+            formData.append('path', filePath);
+
+            try {
+                const uploadRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload`, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: { 'Authorization': `Bearer ${API_KEY}` },
+                    body: formData
+                });
+
+                if (!uploadRes.ok) throw new Error("Error en subida");
+
+                status.innerText = "✅ ¡Enviado!";
+                await new Promise(r => setTimeout(r, 1800));
+
+                const queueRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/queue`, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: { 
+                        'Authorization': `Bearer ${API_KEY}`,
+                        'Content-Type': 'application/json' 
+                    },
+                    body: JSON.stringify({ file: filePath, is_request: true })
+                });
+
+                if (queueRes.ok) {
+                    status.innerText = "📻 ¡Saliendo al aire!";
+                    nicknameInput.value = ""; 
+                    setTimeout(() => { status.innerText = "Ready."; }, 5000);
+                } else {
+                    status.innerText = "⚠️ Error al encolar.";
+                }
+            } catch (err) {
+                status.innerText = "❌ Error: " + err.message;
+                resetUI();
+            }
+        }
+    </script>
+</body>
+</html>
