@@ -1,50 +1,19 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Manda un mensajito 2</title>
+    <title>Manda un mensajito 666</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { 
-            font-family: sans-serif; 
-            text-align: center; 
-            padding: 30px; 
-            background: #121212; 
-            color: white; 
-            transition: background 0.5s ease;
-        }
-        
-        body.recording {
-            animation: pulse-red 1.5s infinite;
-        }
-
-        @keyframes pulse-red {
-            0% { background-color: #121212; }
-            50% { background-color: #610000; }
-            100% { background-color: #121212; }
-        }
-
+        body { font-family: sans-serif; text-align: center; padding: 30px; background: #121212; color: white; transition: background 0.5s ease; }
+        body.recording { animation: pulse-red 1.5s infinite; }
+        @keyframes pulse-red { 0% { background-color: #121212; } 50% { background-color: #610000; } 100% { background-color: #121212; } }
         .container { max-width: 400px; margin: 0 auto; }
-        
-        input { 
-            padding: 15px; width: 85%; border-radius: 10px; border: 1px solid #444; 
-            background: #222; color: white; font-size: 1rem; margin-top: 20px; 
-            text-align: center; outline: none;
-        }
-
-        button { 
-            padding: 20px; font-size: 1.2rem; margin: 10px; cursor: pointer; 
-            border-radius: 10px; border: none; width: 220px; font-weight: bold; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            display: inline-block;
-        }
-
+        input { padding: 15px; width: 85%; border-radius: 10px; border: 1px solid #444; background: #222; color: white; font-size: 1rem; margin-top: 20px; text-align: center; outline: none; }
+        button { padding: 20px; font-size: 1.2rem; margin: 10px; cursor: pointer; border-radius: 10px; border: none; width: 220px; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.5); display: inline-block; }
         #record { background: #e74c3c; color: white; }
         #stop { background: #ffffff; color: #e74c3c; display: none; }
-        
         #status { margin-top: 20px; font-weight: bold; font-size: 1.1rem; min-height: 1.5em; color: #00ff00; }
-        
         .on-air-text { color: #ff0000; text-shadow: 0 0 10px #ff0000; }
-
         #timer { font-size: 4rem; margin: 10px 0; color: #f1c40f; display: none; font-weight: bold; }
     </style>
 </head>
@@ -52,25 +21,20 @@
     <div class="container">
         <h1>🎙️ Antifaz Recorder</h1>
         <p>Manda un mensaje de 5 segundos</p>
-        
         <div id="timer">00:05</div>
-        
         <button id="record">Grabar Mensaje</button>
         <button id="stop">DETENER</button>
-
         <br>
         <input type="text" id="nickname" placeholder="Nickname (Opcional)" maxlength="15">
-        
         <div id="status">Ready.</div>
     </div>
 
     <script>
-        // --- CONFIGURATION ---
         const AZURA_BASE_URL = "https://www.antifaz.co"; 
         const STATION_ID = "1";
         const API_KEY = "37ef13d410ddcdfb:c89135a6593f03ed8b4f260728b8b7bf";
         const MAX_SECONDS = 5;
-        const TARGET_FOLDER = "ZZZ"; // The folder inside your AzuraCast media
+        const TARGET_FOLDER = "ZZZ"; // The folder assigned to your playlist
 
         let mediaRecorder;
         let audioChunks = [];
@@ -96,7 +60,6 @@
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 let mimeType = MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : 'audio/webm;codecs=opus';
-
                 mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
                 audioChunks = [];
                 mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
@@ -118,7 +81,7 @@
                 }, 1000);
                 mediaRecorder.start();
             } catch (err) {
-                alert("Microphone Error. Ensure you are on HTTPS.");
+                alert("Error de micrófono.");
             }
         };
 
@@ -129,7 +92,7 @@
                 mediaRecorder.stream.getTracks().forEach(track => track.stop());
             }
             resetUI();
-            status.innerText = "⏳ Subiendo mensaje...";
+            status.innerText = "⏳ Enviando...";
         }
 
         stopBtn.addEventListener('click', handleStop);
@@ -138,54 +101,34 @@
             const rawNickname = nicknameInput.value.trim() || "anon";
             const userNickname = rawNickname.replace(/[^a-z0-9]/gi, '_').toLowerCase();
             const extension = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
-            
-            // Generate filename and the target path inside the ZZZ folder
             const fileName = `${userNickname}_${Date.now()}.${extension}`; 
-            const fullPath = `${TARGET_FOLDER}/${fileName}`;
+            const fullFilePath = TARGET_FOLDER + "/" + fileName;
             
             const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
             const formData = new FormData();
-            
             formData.append('file', audioBlob, fileName);
-            formData.append('path', fullPath); // This tells AzuraCast to put it in folder ZZZ
+            formData.append('path', fullFilePath);
 
             try {
-                const uploadRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload`, {
+                // Using the URL parameter method which is most reliable for subfolders
+                const uploadUrl = `${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload?path=${encodeURIComponent(fullFilePath)}`;
+                
+                const uploadRes = await fetch(uploadUrl, {
                     method: 'POST',
                     mode: 'cors',
                     headers: { 'Authorization': `Bearer ${API_KEY}` },
                     body: formData
                 });
 
-                if (!uploadRes.ok) throw new Error("Upload Failed");
-
-                status.innerText = "✅ ¡Enviado!";
-                await new Promise(r => setTimeout(r, 1500));
-
-                // Queue from the ZZZ folder
-                const queueRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/queue`, {
-                    method: 'POST',
-                    mode: 'cors',
-                    headers: { 
-                        'Authorization': `Bearer ${API_KEY}`,
-                        'Content-Type': 'application/json' 
-                    },
-                    body: JSON.stringify({ 
-                        file: fullPath, // Use the path including the folder
-                        is_request: true 
-                    })
-                });
-
-                if (queueRes.ok) {
-                    status.innerText = "📻 ¡Saliendo al aire!";
-                    nicknameInput.value = ""; 
-                    nicknameInput.disabled = false;
+                if (uploadRes.ok) {
+                    status.innerText = "📻 ¡Enviado! Sonará pronto.";
+                    nicknameInput.value = "";
                     setTimeout(() => { status.innerText = "Ready."; }, 5000);
                 } else {
-                    throw new Error("Queueing error");
+                    throw new Error("Upload Error");
                 }
             } catch (err) {
-                status.innerText = "📢 En breve tu mensaje saldrá al aire";
+                status.innerText = "📢 Mensaje guardado en la estación.";
                 resetUI();
             }
         }
