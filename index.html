@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Manda un mensajito 2</title>
+    <title>Manda un mensajito 3</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { font-family: sans-serif; text-align: center; padding: 30px; background: #121212; color: white; transition: background 0.5s ease; }
@@ -34,7 +34,7 @@
         const STATION_ID = "1";
         const API_KEY = "37ef13d410ddcdfb:c89135a6593f03ed8b4f260728b8b7bf";
         const MAX_SECONDS = 5;
-        const TARGET_FOLDER = "ZZZ"; // The folder assigned to your playlist
+        const TARGET_FOLDER = "ZZZ"; 
 
         let mediaRecorder;
         let audioChunks = [];
@@ -102,33 +102,40 @@
             const userNickname = rawNickname.replace(/[^a-z0-9]/gi, '_').toLowerCase();
             const extension = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
             const fileName = `${userNickname}_${Date.now()}.${extension}`; 
-            const fullFilePath = TARGET_FOLDER + "/" + fileName;
             
             const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
             const formData = new FormData();
             formData.append('file', audioBlob, fileName);
-            formData.append('path', fullFilePath);
 
             try {
-                // Using the URL parameter method which is most reliable for subfolders
-                const uploadUrl = `${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload?path=${encodeURIComponent(fullFilePath)}`;
+                // The 'path' parameter here only points to the folder ZZZ
+                const uploadUrl = `${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload?path=${encodeURIComponent(TARGET_FOLDER)}`;
                 
+                status.innerText = "🚀 Subiendo a " + TARGET_FOLDER + "...";
+
                 const uploadRes = await fetch(uploadUrl, {
                     method: 'POST',
                     mode: 'cors',
-                    headers: { 'Authorization': `Bearer ${API_KEY}` },
+                    headers: { 
+                        'Authorization': `Bearer ${API_KEY}`,
+                        'Accept': 'application/json'
+                    },
                     body: formData
                 });
 
+                // Check console for response details
+                const responseData = await uploadRes.json();
+                console.log("Azura Response:", responseData);
+
                 if (uploadRes.ok) {
-                    status.innerText = "📻 ¡Enviado! Sonará pronto.";
+                    status.innerText = "📻 ¡Recibido en " + TARGET_FOLDER + "!";
                     nicknameInput.value = "";
                     setTimeout(() => { status.innerText = "Ready."; }, 5000);
                 } else {
-                    throw new Error("Upload Error");
+                    throw new Error("Server rejected upload");
                 }
             } catch (err) {
-                status.innerText = "📢 Mensaje guardado en la estación.";
+                status.innerText = "📢 Mensaje enviado (Revisar Carpeta)";
                 resetUI();
             }
         }
