@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Mojo 1</title>
+    <title>MEMEs</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { font-family: sans-serif; text-align: center; padding: 30px; background: #121212; color: white; transition: background 0.5s ease; }
@@ -30,7 +30,6 @@
     </div>
 
     <script>
-        // --- CONFIGURATION ---
         const AZURA_BASE_URL = "https://www.antifaz.co"; 
         const STATION_ID = "1";
         const API_KEY = "177093c549ffeadf:c5c6c62943fee9da8db322da6bba0371";
@@ -81,7 +80,7 @@
                 }, 1000);
                 mediaRecorder.start();
             } catch (err) {
-                alert("Error de micrófono. Revisa los permisos.");
+                alert("Error de micrófono.");
             }
         };
 
@@ -92,7 +91,7 @@
                 mediaRecorder.stream.getTracks().forEach(track => track.stop());
             }
             resetUI();
-            status.innerText = "⏳ Subiendo...";
+            status.innerText = "⏳ Enviando...";
         }
 
         stopBtn.addEventListener('click', handleStop);
@@ -103,33 +102,28 @@
             const extension = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
             const fileName = `${userNickname}_${Date.now()}.${extension}`; 
             
+            // THE FIX: Move api-key and path into the URL so Nginx can't strip them
+            const uploadUrl = `${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload` + 
+                              `?api-key=${encodeURIComponent(API_KEY)}` + 
+                              `&path=${encodeURIComponent(TARGET_FOLDER + '/' + fileName)}`;
+
             const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
             const formData = new FormData();
-            
-            // We send the path in the URL to ensure it's prioritized
-            const uploadUrl = `${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload?path=${encodeURIComponent(TARGET_FOLDER + '/' + fileName)}`;
-
             formData.append('file', audioBlob, fileName);
 
             try {
+                // NO HEADERS used here to avoid CORS/Nginx interference
                 const response = await fetch(uploadUrl, {
                     method: 'POST',
-                    mode: 'cors',
-                    headers: {
-                        // Plan C: Send both common formats to ensure the server picks one up
-                        'Authorization': `Bearer ${API_KEY}`, 
-                        'X-API-Key': API_KEY,
-                        'Accept': 'application/json'
-                    },
-                    body: formData
+                    mode: 'cors'
                 });
 
                 const result = await response.json();
                 console.log("Status:", response.status);
-                console.log("Full Result:", result);
+                console.log("Result:", result);
 
                 if (response.ok) {
-                    status.innerText = "📻 ¡Enviado a " + TARGET_FOLDER + "!";
+                    status.innerText = "📻 ¡Mensaje en carpeta ZZZ!";
                     nicknameInput.value = "";
                     setTimeout(() => { status.innerText = "Ready."; }, 5000);
                 } else {
@@ -137,7 +131,7 @@
                 }
             } catch (err) {
                 console.error("Network Error:", err);
-                status.innerText = "📢 Error de red. Revisa la consola.";
+                status.innerText = "📢 Error de red.";
                 resetUI();
             }
         }
