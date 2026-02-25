@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Manda MEME platonico</title>
+    <title>sirena</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { font-family: sans-serif; text-align: center; padding: 30px; background: #121212; color: white; transition: background 0.5s ease; }
@@ -30,7 +30,6 @@
     </div>
 
     <script>
-        // --- CONFIGURATION ---
         const AZURA_BASE_URL = "https://www.antifaz.co"; 
         const STATION_ID = "1";
         const API_KEY = "177093c549ffeadf:c5c6c62943fee9da8db322da6bba0371";
@@ -103,22 +102,21 @@
             const userNickname = rawNickname.replace(/[^a-z0-9]/gi, '_').toLowerCase();
             const extension = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
             const fileName = `${userNickname}_${Date.now()}.${extension}`; 
-            const fullPath = `${TARGET_FOLDER}/${fileName}`;
             
+            // RELIABILITY FIX: Pass key and path in the URL to avoid header stripping
+            const uploadUrl = `${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload` + 
+                              `?api-key=${encodeURIComponent(API_KEY)}` + 
+                              `&path=${encodeURIComponent(TARGET_FOLDER + '/' + fileName)}`;
+
             const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
             const formData = new FormData();
             formData.append('file', audioBlob, fileName);
-            formData.append('path', fullPath);
 
             try {
-                const uploadRes = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload`, {
+                const uploadRes = await fetch(uploadUrl, {
                     method: 'POST',
-                    mode: 'cors',
-                    headers: { 
-                        'X-API-Key': API_KEY,
-                        'Accept': 'application/json'
-                    },
-                    body: formData
+                    mode: 'cors'
+                    // No custom headers = No "pre-flight" 403 blocks in most cases
                 });
 
                 console.log("Status Code:", uploadRes.status);
