@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Manda un mensajito plan A</title>
+    <title>Manda un mensajito planton</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { font-family: sans-serif; text-align: center; padding: 30px; background: #121212; color: white; transition: background 0.5s ease; }
@@ -115,7 +115,7 @@
                     method: 'POST',
                     mode: 'cors',
                     headers: { 
-                        'Authorization': `Bearer ${API_KEY}`,
+                        'X-API-Key': API_KEY,
                         'Accept': 'application/json'
                     },
                     body: formData
