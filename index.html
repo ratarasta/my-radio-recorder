@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>sirena</title>
+    <title>Mojo Mojo</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { font-family: sans-serif; text-align: center; padding: 30px; background: #121212; color: white; transition: background 0.5s ease; }
@@ -30,16 +30,16 @@
     </div>
 
     <script>
+        // --- CONFIGURATION ---
         const AZURA_BASE_URL = "https://www.antifaz.co"; 
         const STATION_ID = "1";
         const API_KEY = "177093c549ffeadf:c5c6c62943fee9da8db322da6bba0371";
-        const MAX_SECONDS = 5;
         const TARGET_FOLDER = "ZZZ"; 
 
         let mediaRecorder;
         let audioChunks = [];
         let countdownInterval;
-        let timeLeft = MAX_SECONDS;
+        let timeLeft = 5;
 
         const recordBtn = document.getElementById('record');
         const stopBtn = document.getElementById('stop');
@@ -65,7 +65,7 @@
                 mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
                 mediaRecorder.onstop = uploadAudio;
 
-                timeLeft = MAX_SECONDS;
+                timeLeft = 5;
                 timerDisplay.innerText = "00:05";
                 timerDisplay.style.display = 'block';
                 nicknameInput.disabled = true;
@@ -81,7 +81,7 @@
                 }, 1000);
                 mediaRecorder.start();
             } catch (err) {
-                alert("Error de micrófono.");
+                alert("Error de micrófono. Revisa los permisos.");
             }
         };
 
@@ -103,36 +103,39 @@
             const extension = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
             const fileName = `${userNickname}_${Date.now()}.${extension}`; 
             
-            // RELIABILITY FIX: Pass key and path in the URL to avoid header stripping
-            const uploadUrl = `${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload` + 
-                              `?api-key=${encodeURIComponent(API_KEY)}` + 
-                              `&path=${encodeURIComponent(TARGET_FOLDER + '/' + fileName)}`;
-
             const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
             const formData = new FormData();
+            
+            // The file itself
             formData.append('file', audioBlob, fileName);
+            
+            // The folder path (now that CORS is fixed, this should work!)
+            formData.append('path', `${TARGET_FOLDER}/${fileName}`);
 
             try {
-                const uploadRes = await fetch(uploadUrl, {
+                const response = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload`, {
                     method: 'POST',
-                    mode: 'cors'
-                    // No custom headers = No "pre-flight" 403 blocks in most cases
+                    mode: 'cors',
+                    headers: {
+                        'X-API-Key': API_KEY, // Modern AzuraCast API header
+                        'Accept': 'application/json'
+                    },
+                    body: formData
                 });
 
-                console.log("Status Code:", uploadRes.status);
-                const responseData = await uploadRes.json();
-                console.log("Server Response:", responseData);
+                const result = await response.json();
+                console.log("AzuraCast Response:", result);
 
-                if (uploadRes.ok) {
-                    status.innerText = "📻 Recibido en carpeta " + TARGET_FOLDER;
+                if (response.ok) {
+                    status.innerText = "📻 ¡Enviado a " + TARGET_FOLDER + "!";
                     nicknameInput.value = "";
                     setTimeout(() => { status.innerText = "Ready."; }, 5000);
                 } else {
-                    status.innerText = "❌ Error: " + (responseData.message || "Upload failed");
+                    status.innerText = "❌ Error: " + (result.message || "403 Forbidden");
                 }
             } catch (err) {
-                console.error("Fetch error:", err);
-                status.innerText = "📢 Error de conexión. Revisa la consola.";
+                console.error("Connection error:", err);
+                status.innerText = "📢 Error de red. Revisa la consola.";
                 resetUI();
             }
         }
