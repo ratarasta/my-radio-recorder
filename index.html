@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Mojo Mojo</title>
+    <title>Mojo 1</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { font-family: sans-serif; text-align: center; padding: 30px; background: #121212; color: white; transition: background 0.5s ease; }
@@ -106,35 +106,37 @@
             const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
             const formData = new FormData();
             
-            // The file itself
+            // We send the path in the URL to ensure it's prioritized
+            const uploadUrl = `${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload?path=${encodeURIComponent(TARGET_FOLDER + '/' + fileName)}`;
+
             formData.append('file', audioBlob, fileName);
-            
-            // The folder path (now that CORS is fixed, this should work!)
-            formData.append('path', `${TARGET_FOLDER}/${fileName}`);
 
             try {
-                const response = await fetch(`${AZURA_BASE_URL}/api/station/${STATION_ID}/files/upload`, {
+                const response = await fetch(uploadUrl, {
                     method: 'POST',
                     mode: 'cors',
                     headers: {
-                        'X-API-Key': API_KEY, // Modern AzuraCast API header
+                        // Plan C: Send both common formats to ensure the server picks one up
+                        'Authorization': `Bearer ${API_KEY}`, 
+                        'X-API-Key': API_KEY,
                         'Accept': 'application/json'
                     },
                     body: formData
                 });
 
                 const result = await response.json();
-                console.log("AzuraCast Response:", result);
+                console.log("Status:", response.status);
+                console.log("Full Result:", result);
 
                 if (response.ok) {
                     status.innerText = "📻 ¡Enviado a " + TARGET_FOLDER + "!";
                     nicknameInput.value = "";
                     setTimeout(() => { status.innerText = "Ready."; }, 5000);
                 } else {
-                    status.innerText = "❌ Error: " + (result.message || "403 Forbidden");
+                    status.innerText = "❌ Error " + response.status + ": " + (result.message || "Forbidden");
                 }
             } catch (err) {
-                console.error("Connection error:", err);
+                console.error("Network Error:", err);
                 status.innerText = "📢 Error de red. Revisa la consola.";
                 resetUI();
             }
